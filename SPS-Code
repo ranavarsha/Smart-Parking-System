@@ -1,0 +1,65 @@
+#include <WiFi.h>
+#include <HTTPClient.h>
+
+// Pin Definitions
+#define IR_SENSOR_PIN 5      // IR sensor connected to GPIO 5
+#define GREEN_LED_PIN 21     // Green LED for vacant slot
+#define RED_LED_PIN 22       // Red LED for occupied slot
+
+// Wi-Fi Credentials
+const char* ssid = "your_SSID";          // Replace with your WiFi SSID
+const char* password = "your_PASSWORD";  // Replace with your WiFi Password
+
+// Cloud Server Endpoint
+const String serverUrl = "https://your-cloud-server-url.com/update_parking_status"; // Replace with actual URL
+
+void setupWiFi() {
+  Serial.begin(115200);
+  WiFi.begin(ssid, password);
+
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(1000);
+    Serial.println("Connecting to WiFi...");
+  }
+  Serial.println("Connected to WiFi!");
+}
+
+void setupPins() {
+  pinMode(IR_SENSOR_PIN, INPUT);
+  pinMode(GREEN_LED_PIN, OUTPUT);
+  pinMode(RED_LED_PIN, OUTPUT);
+}
+
+void sendToCloud(bool isOccupied) {
+  HTTPClient http;
+  http.begin(serverUrl);
+  http.addHeader("Content-Type", "application/json");
+
+  String payload = "{ \"slot_id\": 1, \"status\": " + String(isOccupied ? "1" : "0") + " }";
+  int httpResponseCode = http.POST(payload);
+
+  if (httpResponseCode > 0) {
+    Serial.println("Status Update Sent: " + String(httpResponseCode));
+  } else {
+    Serial.println("Error sending status update: " + String(httpResponseCode));
+  }
+  http.end();
+}
+
+void setup() {
+  setupWiFi();
+  setupPins();
+}
+
+void loop() {
+  bool isOccupied = digitalRead(IR_SENSOR_PIN) == LOW; // LOW = Vehicle detected
+
+  // Update LEDs based on parking status
+  digitalWrite(GREEN_LED_PIN, !isOccupied);
+  digitalWrite(RED_LED_PIN, isOccupied);
+
+  // Send status to the cloud
+  sendToCloud(isOccupied);
+
+  delay(1000); // Check again after 1 second
+}
